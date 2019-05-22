@@ -20,12 +20,14 @@ namespace GZipTest.Zipper
         public void Compress()
         {
             Zip(_sourceStream, _targetStream, ChunkBufferSize);
+
             _queue.StartThreads();
         }
 
         public void Decompress()
         {
             Unzip(_sourceStream, _targetStream);
+
             _queue.StartThreads();
         }
 
@@ -57,6 +59,7 @@ namespace GZipTest.Zipper
                 var compressingTask = new MyTask(() =>
                 {
                     var chunkArray = new byte[size];
+
                     lock (sourceStream)
                     {
                         sourceStream.Seek(chunk.Offset, SeekOrigin.Begin);
@@ -68,6 +71,48 @@ namespace GZipTest.Zipper
                 });
 
                 _queue.CompressTasks.Enqueue(compressingTask);
+
+                var writingTask = new MyTask(() =>
+                {
+                    while (true)
+                    {
+                        if (!chunk.HasResult)
+                        {
+                            continue;
+                        }
+
+                        lock (targetStream)
+                        {
+                            chunk.WriteResult(targetStream);
+                        }
+
+                        break;
+                    }
+                });
+
+                _queue.WritingTasks.Enqueue(writingTask);
+            }
+        }
+
+        private void Unzip(Stream sourceStream, Stream targetStream)
+        {
+            _chunks = GetChunks(sourceStream);
+
+            foreach (var chunk in _chunks)
+            {
+                var decompressingTask = new MyTask(() =>
+                {
+                    lock (sourceStream)
+                    {
+                        sourceStream.Seek(chunk.Offset, SeekOrigin.Begin);
+                        chunk.Input = new byte[chunk.Size];
+                        sourceStream.Read(chunk.Input, 0, chunk.Size);
+                    }
+
+                    chunk.Decompress();
+                });
+
+                _queue.CompressTasks.Enqueue(decompressingTask);
 
                 var writingTask = new MyTask(() =>
                 {
@@ -119,48 +164,6 @@ namespace GZipTest.Zipper
             }
 
             return chunks;
-        }
-
-        private void Unzip(Stream sourceStream, Stream targetStream)
-        {
-            _chunks = GetChunks(sourceStream);
-
-            foreach (var chunk in _chunks)
-            {
-                var decompressingTask = new MyTask(() =>
-                {
-                    lock (sourceStream)
-                    {
-                        sourceStream.Seek(chunk.Offset, SeekOrigin.Begin);
-                        chunk.Input = new byte[chunk.Size];
-                        sourceStream.Read(chunk.Input, 0, chunk.Size);
-                    }
-
-                    chunk.Decompress();
-                });
-
-                _queue.CompressTasks.Enqueue(decompressingTask);
-
-                var writingTask = new MyTask(() =>
-                {
-                    while (true)
-                    {
-                        if (!chunk.HasResult)
-                        {
-                            continue;
-                        }
-
-                        lock (targetStream)
-                        {
-                            chunk.WriteResult(targetStream);
-                        }
-
-                        break;
-                    }
-                });
-
-                _queue.WritingTasks.Enqueue(writingTask);
-            }
         }
 
         public Zipper(Stream sourceStream, Stream targetStream, Queue queue)

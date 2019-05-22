@@ -11,33 +11,17 @@ namespace GZipTest.Tasks
         public readonly Buffer<MyTask> CompressTasks = new Buffer<MyTask>();
         public readonly Buffer<MyTask> WritingTasks = new Buffer<MyTask>();
 
-        private void CompressConsumer()
+        public Queue(Action<Exception> exceptionHandler)
         {
-            while (true)
+            // initialize queue with 1 writer consumer and multiple coppressing consumers
+            _threads = new List<Thread>
+                            {
+                                new Thread(() => ExecuteHandler(Writer, exceptionHandler))
+                            };
+
+            for (int i = 0; i < Environment.ProcessorCount - 1; i++)
             {
-                var task = CompressTasks.Dequeue();
-
-                if (task == null)
-                {
-                    break;
-                }
-
-                task.Action.Invoke();
-            }
-        }
-
-        private void WriterConsumer()
-        {
-            while (true)
-            {
-                var task = WritingTasks.Dequeue();
-
-                if (task == null)
-                {
-                    break;
-                }
-
-                task.Action.Invoke();
+                _threads.Add(new Thread(() => ExecuteHandler(Compressor, exceptionHandler)));
             }
         }
 
@@ -69,20 +53,39 @@ namespace GZipTest.Tasks
                 }
 
                 foreach (var thread in _threads)
-                { 
+                {
                     thread.Abort();
                 }
             }
         }
 
-        public Queue(Action<Exception> exceptionHandler)
+        private void Compressor()
         {
-            // initialize queue with 1 writer consumer and multiple coppressing consumers
-            _threads = new List<Thread> { new Thread(() => ExecuteHandler(WriterConsumer, exceptionHandler)) };
-
-            for (var i = 0; i < Environment.ProcessorCount - 1; i++)
+            while (true)
             {
-                _threads.Add(new Thread(() => ExecuteHandler(CompressConsumer, exceptionHandler)));
+                var task = CompressTasks.Dequeue();
+
+                if (task == null)
+                {
+                    break;
+                }
+
+                task.Action.Invoke();
+            }
+        }
+
+        private void Writer()
+        {
+            while (true)
+            {
+                var task = WritingTasks.Dequeue();
+
+                if (task == null)
+                {
+                    break;
+                }
+
+                task.Action.Invoke();
             }
         }
     }

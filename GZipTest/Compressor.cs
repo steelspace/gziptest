@@ -1,5 +1,4 @@
 ﻿using GZipTest.Tasks;
-using GZipTest.Zipper;
 using System;
 using System.IO;
 
@@ -7,7 +6,7 @@ namespace GZipTest
 {
     public class Compressor
     {
-        private static Exception exception;
+        private static Exception _exception;
 
         public void Compress(string sourceFile, string targetFile)
         {
@@ -27,7 +26,6 @@ namespace GZipTest
         {
             using (var sourceStream = new FileStream(sourceFile, FileMode.Open))
             using (var targetStream = new FileStream(targetFile, FileMode.Create))
-
             using (var zipper = new Zipper.Zipper(sourceStream, targetStream, new Queue(ThreadExceptionHandler)))
             {
                 if (compress)
@@ -40,15 +38,15 @@ namespace GZipTest
                 }
             }
 
-            if (exception != null)
+            if (_exception != null)
             {
-                throw exception;
+                throw _exception;
             }
         }
 
         private void ThreadExceptionHandler(Exception exception)
         {
-            Compressor.exception = exception;
+            _exception = exception;
         }
     }
 }

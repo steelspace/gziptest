@@ -1,8 +1,8 @@
 {
   "profiles": {
     "GZipTest": {
-      "commandName": "Project",
-      "commandLineArgs": "compress C:\\Users\\e90037269\\Downloads\\Docker.exe c:\\temp\\d.gzip"
+        "commandName": "Project",
+        "commandLineArgs": "decompress c:\\temp\\test.gzip c:\\temp\\test.uncompressed"
     }
   }
 }
